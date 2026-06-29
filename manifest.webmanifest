@@ -1,7 +1,8 @@
 ﻿{
   "name": "Схемы IN PRO",
   "short_name": "Схемы",
-  "start_url": "Схемы_IN_PRO_mobile.html",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f2f2f7",
   "theme_color": "#f2f2f7",
