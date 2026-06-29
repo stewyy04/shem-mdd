@@ -1,0 +1,672 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конструктор ОДД (Финал - Жесткие полосы)</title>
+    <style>
+        :root {
+            --bg-color: #f2f2f7;
+            --panel-bg: #ffffff;
+            --accent-color: #007aff;
+            --text-primary: #1c1c1e;
+            --text-secondary: #8e8e93;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+        }
+
+        .header {
+            max-width: 1600px;
+            margin: 0 auto 20px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 { margin: 0; font-size: 24px; font-weight: 600; }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 24px;
+            max-width: 1800px;
+            margin: 0 auto;
+            height: calc(100vh - 80px);
+        }
+
+        .controls {
+            background-color: var(--panel-bg);
+            padding: 24px;
+            border-radius: 18px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            width: 380px;
+            flex-shrink: 0;
+            height: 100%;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+        .controls::-webkit-scrollbar { width: 6px; }
+        .controls::-webkit-scrollbar-thumb { background-color: #c1c1c1; border-radius: 3px; }
+
+        .control-section {
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e5e5ea;
+        }
+
+        h3 {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin: 0 0 12px 0;
+            font-weight: 600;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        
+        .input-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        label { font-size: 13px; font-weight: 500; color: #555; }
+        input[type="number"] { width: 50px; padding: 6px; border: 1px solid #d1d1d6; border-radius: 8px; text-align: center; }
+        input[type="text"] { width: 100%; padding: 6px; border: 1px solid #d1d1d6; border-radius: 8px; font-size: 13px; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .btn-primary { background-color: var(--accent-color); color: white; }
+        .btn-success { background-color: #34c759; color: white; }
+        .btn-secondary { background-color: #e5e5ea; color: var(--text-primary); }
+
+        .movement-item { display: flex; align-items: center; gap: 10px; font-size: 14px; padding: 4px 0; }
+        input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent-color); cursor: pointer; }
+
+        .canvas-wrapper {
+            flex-grow: 1;
+            background-color: var(--panel-bg);
+            border-radius: 18px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            overflow: hidden;
+        }
+        canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Конструктор ОДД</h1>
+        <button id="saveButton" class="btn btn-success" style="width: auto; margin: 0;">Скачать схему (PNG)</button>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <div class="control-section">
+                <h3>Конфигурация</h3>
+                <div class="input-row">
+                    <label>Кол-во дорог:</label>
+                    <input type="number" id="directionCount" min="2" max="6" value="3">
+                </div>
+                <button id="updateDirections" class="btn btn-primary" style="margin-top: 10px;">Перестроить</button>
+            </div>
+            
+            <div class="control-section">
+                <h3>Настройки направлений</h3>
+                <div id="angleControls"></div>
+            </div>
+            
+            <div class="control-section">
+                <h3>Схема движения</h3>
+                <div id="movementControls"></div>
+            </div>
+            
+            <div class="control-section">
+                <h3>Инфраструктура</h3>
+                <div id="crosswalkControls"></div>
+            </div>
+            
+            <button id="resetButton" class="btn btn-secondary">Сбросить настройки</button>
+        </div>
+        
+        <div class="canvas-wrapper">
+            <canvas id="schemeCanvas" width="1400" height="1100"></canvas>
+        </div>
+    </div>
+
+<script>
+    // --- НАСТРОЙКИ ---
+    const CONFIG = {
+        roadWidth: 160,           
+        roadLength: 450,          
+        nodeRadius: 28,           
+        centerRadius: 85,         
+        turnRadius: 30,           
+        roadColor: '#4a4a4a',     
+        markingColor: '#ffffff',  
+        arrowActive: '#ff3b30',   
+        arrowInactive: 'rgba(255, 59, 48, 0.12)', 
+        centerX: 700,             
+        centerY: 550,
+        crosswalkDist: 170,       
+        stopLineDist: 210         
+    };
+
+    let directions = [];
+    let movements = [];
+    let crosswalks = [];
+    let directionCount = 3;
+    let canvas, ctx;
+
+    window.onload = function() {
+        canvas = document.getElementById('schemeCanvas');
+        ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        document.getElementById('updateDirections').addEventListener('click', initializeDirections);
+        document.getElementById('resetButton').addEventListener('click', resetSettings);
+        document.getElementById('saveButton').addEventListener('click', saveImage);
+        
+        initializeDirections();
+    };
+
+    function saveImage() {
+        const link = document.createElement('a');
+        link.download = 'traffic-scheme.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }
+
+    function updateDirectionCount() {
+        const input = document.getElementById('directionCount');
+        let val = parseInt(input.value);
+        if (val < 2) val = 2;
+        if (val > 8) val = 8;
+        input.value = val;
+        directionCount = val;
+    }
+
+    function initializeDirections() {
+        updateDirectionCount();
+        
+        directions = [];
+        movements = [];
+        crosswalks = [];
+        
+        let startAngles = [];
+        if (directionCount === 3) {
+            startAngles = [160, 285, 15]; 
+        } else if (directionCount === 4) {
+            startAngles = [0, 90, 180, 270];
+        } else {
+            const step = 360 / directionCount;
+            for(let i=0; i<directionCount; i++) startAngles.push(i * step);
+        }
+
+        for (let i = 0; i < directionCount; i++) {
+            directions.push({
+                id: i + 1,
+                angle: startAngles[i] !== undefined ? startAngles[i] : (i * (360/directionCount)),
+                name: `Напр. ${i + 1}`
+            });
+            crosswalks.push({ direction: i + 1, active: false });
+
+            for (let j = 0; j < directionCount; j++) {
+                if (i !== j) {
+                    movements.push({
+                        from: i + 1,
+                        to: j + 1,
+                        active: false
+                    });
+                }
+            }
+        }
+        
+        if(movements.length > 0 && directionCount === 3) {
+           const setM = (f, t) => { const m = movements.find(x=>x.from===f && x.to===t); if(m) m.active = true; }
+           setM(1,2); setM(1,3); setM(3,2); setM(3,1);
+        }
+        
+        createControls();
+        drawScheme();
+    }
+
+    function createControls() {
+        const angleContainer = document.getElementById('angleControls');
+        angleContainer.innerHTML = '';
+        directions.forEach((dir, index) => {
+            const group = document.createElement('div');
+            group.className = 'input-group';
+            group.innerHTML = `
+                <div class="input-row">
+                    <label>Направление ${dir.id} (°)</label>
+                    <input type="number" class="angle-inp" min="0" max="360" value="${dir.angle}">
+                </div>
+                <div class="input-row">
+                    <label>Название</label>
+                    <input type="text" class="name-inp" value="${dir.name}">
+                </div>
+            `;
+            group.querySelector('.angle-inp').addEventListener('input', (e) => {
+                directions[index].angle = parseInt(e.target.value);
+                drawScheme();
+            });
+            group.querySelector('.name-inp').addEventListener('input', (e) => {
+                directions[index].name = e.target.value;
+                drawScheme();
+            });
+            angleContainer.appendChild(group);
+        });
+
+        const moveContainer = document.getElementById('movementControls');
+        moveContainer.innerHTML = '';
+        movements.sort((a,b) => a.from - b.from || a.to - b.to).forEach((mov) => {
+            const originalIndex = movements.indexOf(mov);
+            const div = document.createElement('div');
+            div.className = 'movement-item';
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.checked = mov.active;
+            chk.addEventListener('change', () => {
+                movements[originalIndex].active = chk.checked;
+                drawScheme();
+            });
+            const lbl = document.createElement('label');
+            lbl.style.width = '100%';
+            lbl.style.cursor = 'pointer';
+            lbl.textContent = `${mov.from} → ${mov.to}`;
+            lbl.addEventListener('click', () => chk.click());
+            
+            div.appendChild(chk);
+            div.appendChild(lbl);
+            moveContainer.appendChild(div);
+        });
+
+        const crossContainer = document.getElementById('crosswalkControls');
+        crossContainer.innerHTML = '';
+        crosswalks.forEach((cw, index) => {
+            const div = document.createElement('div');
+            div.className = 'movement-item';
+            const chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.checked = cw.active;
+            chk.addEventListener('change', () => {
+                crosswalks[index].active = chk.checked;
+                drawScheme();
+            });
+            const lbl = document.createElement('label');
+            lbl.style.width = '100%';
+            lbl.textContent = `ПП на напр. ${cw.direction}`;
+            div.appendChild(chk);
+            div.appendChild(lbl);
+            crossContainer.appendChild(div);
+        });
+    }
+
+    function resetSettings() {
+        document.getElementById('directionCount').value = 3;
+        initializeDirections();
+    }
+
+    function toRad(deg) { return deg * Math.PI / 180; }
+    
+    // Тип поворота: -1 (Лево), 0 (Прямо), 1 (Право)
+    function getTurnCategory(fromDir, toDir) {
+        const entryAngle = (fromDir.angle + 180) % 360;
+        const targetAngle = toDir.angle;
+        let diff = (targetAngle - entryAngle + 540) % 360 - 180;
+        
+        if (Math.abs(diff) < 25) return 0; // Прямо
+        if (diff < 0) return -1; // Налево
+        return 1; // Направо
+    }
+
+    function getLineIntersection(p1, v1, p2, v2) {
+        const det = v1.x * v2.y - v1.y * v2.x;
+        if (Math.abs(det) < 0.0001) return null;
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const t = (dx * v2.y - dy * v2.x) / det;
+        return { x: p1.x + t * v1.x, y: p1.y + t * v1.y };
+    }
+
+    function drawScheme() {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        drawRoadsLayer();
+        drawMarkingsLayer();
+        drawCrosswalksLayer();
+
+        movements.forEach(d => { if(!d.active) drawSmoothArrow(d, false); });
+        movements.forEach(d => { if(d.active) drawSmoothArrow(d, true); });
+
+        drawNodesLayer();
+    }
+
+    function drawRoadsLayer() {
+        ctx.fillStyle = CONFIG.roadColor;
+        ctx.beginPath();
+        ctx.arc(CONFIG.centerX, CONFIG.centerY, CONFIG.roadWidth * 0.58, 0, Math.PI * 2);
+        ctx.fill();
+
+        directions.forEach(dir => {
+            const rad = toRad(dir.angle);
+            const endX = CONFIG.centerX + Math.cos(rad) * CONFIG.roadLength;
+            const endY = CONFIG.centerY + Math.sin(rad) * CONFIG.roadLength;
+
+            ctx.beginPath();
+            ctx.moveTo(CONFIG.centerX, CONFIG.centerY);
+            ctx.lineTo(endX, endY);
+            ctx.strokeStyle = CONFIG.roadColor;
+            ctx.lineWidth = CONFIG.roadWidth;
+            ctx.lineCap = 'butt';
+            ctx.stroke();
+        });
+    }
+
+    function drawMarkingsLayer() {
+        directions.forEach(dir => {
+            const rad = toRad(dir.angle);
+            const vx = Math.cos(rad);
+            const vy = Math.sin(rad);
+            const px = -vy;
+            const py = vx;
+
+            // Сплошная линия (от стоп-линии вдаль)
+            const startDivX = CONFIG.centerX + vx * CONFIG.stopLineDist;
+            const startDivY = CONFIG.centerY + vy * CONFIG.stopLineDist;
+            const endDivX = CONFIG.centerX + vx * CONFIG.roadLength;
+            const endDivY = CONFIG.centerY + vy * CONFIG.roadLength;
+
+            ctx.beginPath();
+            ctx.moveTo(startDivX, startDivY);
+            ctx.lineTo(endDivX, endDivY);
+            ctx.strokeStyle = CONFIG.markingColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Стоп-линия
+            const stopLineStartX = startDivX;
+            const stopLineStartY = startDivY;
+            const stopLineEndX = stopLineStartX - px * (CONFIG.roadWidth / 2 - 5);
+            const stopLineEndY = stopLineStartY - py * (CONFIG.roadWidth / 2 - 5);
+
+            ctx.beginPath();
+            ctx.moveTo(stopLineStartX, stopLineStartY);
+            ctx.lineTo(stopLineEndX, stopLineEndY);
+            ctx.strokeStyle = CONFIG.markingColor;
+            ctx.lineWidth = 4;
+            ctx.stroke();
+        });
+    }
+
+    function drawSmoothArrow(data, isActive) {
+        const fromDir = directions.find(d => d.id === data.from);
+        const toDir = directions.find(d => d.id === data.to);
+        if (!fromDir || !toDir) return;
+
+        const turnType = getTurnCategory(fromDir, toDir);
+        const color = isActive ? CONFIG.arrowActive : CONFIG.arrowInactive;
+        const width = isActive ? 5 : 4;
+
+        const radFrom = toRad(fromDir.angle);
+        const vxFrom = Math.cos(radFrom);
+        const vyFrom = Math.sin(radFrom);
+        const radTo = toRad(toDir.angle);
+        const vxTo = Math.cos(radTo);
+        const vyTo = Math.sin(radTo);
+
+        // --- ЖЕСТКАЯ ЛОГИКА ПОЛОС ---
+        // Левая полоса (у центра): ratio ~ 0.25
+        // Средняя полоса: ratio ~ 0.5
+        // Правая полоса (у бордюра): ratio ~ 0.75
+        let laneRatio = 0.5;
+        if (turnType === -1) laneRatio = -0.25; // Налево (внутренний радиус)
+        if (turnType === 0) laneRatio = -0.5;   // Прямо (центр)
+        if (turnType === 1) laneRatio = -0.75
+        const laneWidth = CONFIG.roadWidth / 2;
+        // Отступ от ОСЕВОЙ ЛИНИИ вправо
+        const shift = laneWidth * laneRatio;
+
+        // 1. Точка СТАРТА
+        // Вектор "вправо" для входящей: (-vy, vx)
+        const perpX_in = -vyFrom;
+        const perpY_in = vxFrom;
+        
+        const startDist = CONFIG.roadLength - 60;
+        const startX = CONFIG.centerX + vxFrom * startDist + perpX_in * shift;
+        const startY = CONFIG.centerY + vyFrom * startDist + perpY_in * shift;
+
+        // 2. Точка ФИНИША
+        // Вектор "вправо" для исходящей: (vy, -vx)
+        const perpX_out = vyTo;
+        const perpY_out = -vxTo;
+
+        const endDist = CONFIG.roadLength - 60;
+        const endX = CONFIG.centerX + vxTo * endDist + perpX_out * shift;
+        const endY = CONFIG.centerY + vyTo * endDist + perpY_out * shift;
+
+        const moveInX = -vxFrom;
+        const moveInY = -vyFrom;
+
+        const intersection = getLineIntersection(
+            {x: startX, y: startY}, {x: moveInX, y: moveInY},
+            {x: endX, y: endY}, {x: vxTo, y: vyTo} 
+        );
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+
+        // Прямо или поворот?
+        const isStraight = (turnType === 0);
+
+        if (isStraight || !intersection) {
+            ctx.lineTo(endX, endY);
+        } else {
+            ctx.arcTo(intersection.x, intersection.y, endX, endY, CONFIG.turnRadius);
+            ctx.lineTo(endX, endY);
+        }
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        drawArrowHead(endX, endY, vxTo, vyTo, color, isActive);
+
+        if (isActive) {
+            const labelX = startX + vxFrom * 25;
+            const labelY = startY + vyFrom * 25;
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px -apple-system, Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${data.from}${data.to}`, labelX, labelY);
+        }
+    }
+
+    function drawArrowHead(x, y, dx, dy, color, isActive) {
+        const size = isActive ? 18 : 14;
+        const angle = Math.atan2(dy, dx);
+        const arrowAngle = Math.PI / 7;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - size * Math.cos(angle - arrowAngle), y - size * Math.sin(angle - arrowAngle));
+        ctx.lineTo(x - size * Math.cos(angle + arrowAngle), y - size * Math.sin(angle + arrowAngle));
+        ctx.lineTo(x, y);
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    function drawCrosswalksLayer() {
+        directions.forEach(dir => {
+            const cw = crosswalks.find(c => c.direction === dir.id);
+            if (!cw) return;
+
+            const rad = toRad(dir.angle);
+            const cx = CONFIG.centerX + Math.cos(rad) * CONFIG.crosswalkDist;
+            const cy = CONFIG.centerY + Math.sin(rad) * CONFIG.crosswalkDist;
+            
+            const perpX = -Math.sin(rad);
+            const perpY = Math.cos(rad);
+            
+            if (cw.active) {
+                ctx.strokeStyle = '#ffffff'; 
+                ctx.lineWidth = 3; 
+                const stripes = 14;
+                const step = (CONFIG.roadWidth - 15) / stripes;
+                
+                for(let i = 0; i < stripes; i++) {
+                    const offset = (i - (stripes-1)/2) * step; 
+                    const sx = cx + perpX * offset;
+                    const sy = cy + perpY * offset;
+                    ctx.beginPath();
+                    const len = 10; 
+                    ctx.moveTo(sx - Math.cos(rad)*len, sy - Math.sin(rad)*len);
+                    ctx.lineTo(sx + Math.cos(rad)*len, sy + Math.sin(rad)*len);
+                    ctx.stroke();
+                }
+                const lx = cx + Math.cos(rad) * 45 + perpX * (CONFIG.roadWidth/2 + 30);
+                const ly = cy + Math.sin(rad) * 45 + perpY * (CONFIG.roadWidth/2 + 30);
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 15px -apple-system, Arial';
+                ctx.fillText(`П.${dir.id}`, lx-10, ly);
+            }
+        });
+    }
+
+   function drawNodesLayer() {
+    directions.forEach(dir => {
+        const rad = toRad(dir.angle);
+        
+        // 1. Кружок с номером (оставляем как есть)
+        const x = CONFIG.centerX + Math.cos(rad) * (CONFIG.roadLength + 45);
+        const y = CONFIG.centerY + Math.sin(rad) * (CONFIG.roadLength + 45);
+
+        // Кружок с номером
+        ctx.beginPath();
+        ctx.arc(x, y, CONFIG.nodeRadius, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 22px -apple-system, Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(dir.id, x, y);
+
+        // 2. НАЗВАНИЕ УЛИЦЫ - НАД ДОРОГОЙ (не на ней)
+        if (dir.name && dir.name.trim() !== '') {
+            // Точка на дороге ближе к перекрестку
+            // Берем середину дороги между центром и кружком
+            const roadMidDist = CONFIG.roadLength / 2 + 40;
+            const textX = CONFIG.centerX + Math.cos(rad) * roadMidDist;
+            const textY = CONFIG.centerY + Math.sin(rad) * roadMidDist;
+            
+            // Перпендикуляр к дороге для смещения
+            const perpX = -Math.sin(rad);
+            const perpY = Math.cos(rad);
+            
+            // УВЕЛИЧИВАЕМ СМЕЩЕНИЕ, чтобы текст был НАД дорогой
+            // Дорога шириной roadWidth = 150px, значит половина ширины = 75px
+            // Чтобы текст был над дорогой, нужно сместить на (ширина дороги/2 + отступ)
+            const roadHalfWidth = CONFIG.roadWidth / 2;
+            const offset = roadHalfWidth + 35; // Над дорогой с отступом
+            
+            const finalX = textX + perpX * offset;
+            const finalY = textY + perpY * offset;
+            
+            // Визуальная подсказка - линия от текста к дороге (опционально)
+            ctx.beginPath();
+            ctx.moveTo(textX, textY);
+            ctx.lineTo(finalX, finalY);
+            ctx.strokeStyle = 'rgba(0, 122, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Сохраняем текущее состояние контекста
+            ctx.save();
+            
+            // Перемещаем точку вращения в позицию текста
+            ctx.translate(finalX, finalY);
+            
+            // Вычисляем угол для текста
+            let textAngle = rad; // Исходный угол дороги
+            
+            // Корректируем угол для читаемости (текст всегда слева-направо)
+            // Если направление между 90° и 270°, переворачиваем текст
+            const degrees = dir.angle % 360;
+            if (degrees > 90 && degrees < 270) {
+                textAngle += Math.PI; // Поворот на 180°
+            }
+            
+            // Поворачиваем контекст
+            ctx.rotate(textAngle);
+            
+            // Рисуем текст (теперь относительно точки 0,0)
+            ctx.font = 'bold 18px -apple-system, Arial';
+            ctx.fillStyle = '#1a1a1a';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Фон для текста для лучшей читаемости
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            const textWidth = ctx.measureText(dir.name).width;
+            const padding = 8;
+            ctx.fillRect(-textWidth/2 - padding, -12, textWidth + padding*2, 24);
+            
+            // Сам текст
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillText(dir.name, 0, 0);
+            
+            // Рамка вокруг текста
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(-textWidth/2 - padding, -12, textWidth + padding*2, 24);
+            
+            // Восстанавливаем контекст
+            ctx.restore();
+        }
+    });
+}
+</script>
+</body>
+</html>
